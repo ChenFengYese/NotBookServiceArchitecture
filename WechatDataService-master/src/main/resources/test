@@ -1,0 +1,89 @@
+for port in $(seq 6374 6379); \
+do \
+mkdir -p ~/redis/node-${port}/conf
+touch ~/redis/node-${port}/conf/redis.conf
+cat << EOF > ~/redis/node-${port}/conf/redis.conf
+port ${PORT}
+bind:0.0.0.0
+cluster-enabled yes
+protected-mode no
+setDaemonize no
+requirepass 123456
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+cluster-announce-ip 192.168.174.133
+cluster-announce-port ${PORT}
+cluster-announce-bus-port ${PORT}
+appendonly yes
+EOF
+done
+
+ for port in `seq 6373 6378`; do \
+  docker run -d -it -p ${port}:${port}  \
+  -v /redis/node-${port}/conf/redis.conf:/usr/local/etc/redis/redis.conf \
+  -v /redis/node-${port}/data:/data \
+  --restart always --name redis-${port} --net host \
+  redis:latest redis-server /usr/local/etc/redis/redis.conf; \
+done
+
+docker run -i --rm -p 6379 --net host redis:latest \
+   redis-cli --cluster create \
+   $(for port in `seq 6111 6116`; do \
+     echo -n "$(docker inspect --format '192.168.174.133' "redis-${port}")":${port} ' ' ; \
+     done) $(echo "--cluster-replicas 1 -a mypassword")
+
+for port in `seq 7000 7005`; do \
+docker run -d -ti -p ${port}:${port} \
+-v $(pwd)/${port}/conf/redis.conf:/usr/local/etc/redis/redis.conf \
+-v $(pwd)/${port}/data:/data \
+--restart always --name redis-${port} --net host \
+--sysctl net.core.somaxconn=1024 redis redis-server /usr/local/etc/redis/redis.conf; \
+done
+
+
+docker run -i -p 6379 --net host redis:latest \
+   redis-cli --cluster create \
+   $(for port in `seq 6374 6378`; do \
+     echo -n "$(docker inspect --format '192.168.174.133' "redis-${port}")":${port} ' ' ; \
+     done) $(echo "--cluster-replicas 1 -a 123456")
+
+
+# 容器1
+docker run -p 6371:6379 -p 16371:16379 --name redis-1 \
+-v ~/redis/node-1/data:/data \
+-v ~/redis/node-1/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.28.0.11 redis redis-server /etc/redis/redis.conf
+
+# 容器2
+docker run -p 6372:6379 -p 16372:16379 --name redis-2 \
+-v ~/redis/node-2/data:/data \
+-v ~/redis/node-2/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.28.0.12 redis redis-server /etc/redis/redis.conf
+
+# 容器3
+docker run -p 6373:6379 -p 16373:16379 --name redis-3 \
+-v ~/redis/node-3/data:/data \
+-v ~/redis/node-3/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.28.0.13 redis redis-server /etc/redis/redis.conf
+
+# 容器4
+docker run -p 6374:6379 -p 16374:16379 --name redis-4 \
+-v ~/redis/node-4/data:/data \
+-v ~/redis/node-4/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.28.0.14 redis redis-server /etc/redis/redis.conf
+
+# 容器5
+docker run -p 6375:6379 -p 16375:16379 --name redis-5 \
+-v ~/redis/node-5/data:/data \
+-v ~/redis/node-5/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.28.0.15 redis redis-server /etc/redis/redis.conf
+
+# 容器6
+docker run -p 6376:6379 -p 16376:16379 --name redis-6 \
+-v ~/redis/node-6/data:/data \
+-v ~/redis/node-6/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.28.0.16 redis redis-server /etc/redis/redis.conf
+
+DBMS: Redis (无版本)
+区分大小写: 普通形式=mixed, 分隔形式=exact
+Failed to connect to any host resolved for DNS name.
